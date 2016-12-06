@@ -87,7 +87,7 @@ static const uds_service_t uds_service_list[] =
     {SID_22, SID_22_MIN_LEN, uds_service_22, TRUE,  TRUE, TRUE,  FALSE, UDS_SA_NON},
     {SID_2E, SID_2E_MIN_LEN, uds_service_2E, FALSE, TRUE, FALSE, FALSE, UDS_SA_LV1},
     {SID_14, SID_14_MIN_LEN, uds_service_14, TRUE,  TRUE, TRUE,  FALSE, UDS_SA_NON},
-    {SID_19, SID_19_MIN_LEN, uds_service_19, TRUE,  TRUE, TRUE,  FALSE, UDS_SA_NON},
+    {SID_19, SID_19_MIN_LEN, uds_service_19, TRUE,  TRUE, TRUE,  TRUE,  UDS_SA_NON},
     {SID_2F, SID_2F_MIN_LEN, uds_service_2F, FALSE, TRUE, FALSE, FALSE, UDS_SA_LV1},
     {SID_31, SID_31_MIN_LEN, uds_service_31, FALSE, TRUE, FALSE, FALSE, UDS_SA_LV1},
 };
@@ -1224,6 +1224,9 @@ uds_main (void)
 	{
 		uds_session = UDS_SESSION_STD;
 		curr_sa = UDS_SA_NON;
+		dis_normal_xmit = FALSE;
+		dis_normal_recv = FALSE;
+		obd_dtc_ctrl(DTC_ON);
 		uds_ioctrl_allstop ();
 	}
 
@@ -1250,9 +1253,8 @@ uds_init (void)
     nt_usdata_t usdata;
 
 	uds_session = UDS_SESSION_STD;
-
-    uds_load_rwdata ();
-
+	uds_ioctrl_allstop();
+    uds_load_rwdata ();	
     usdata.ffindication = uds_dataff_indication;
     usdata.indication = uds_data_indication;
     usdata.confirm = uds_data_confirm;

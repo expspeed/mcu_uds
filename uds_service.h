@@ -77,7 +77,7 @@ typedef enum __UDS_NRC_ENUM__
 #define SID_3E_MIN_LEN      (0x02u)
 #define SID_85_MIN_LEN      (0x02u)
 #define SID_22_MIN_LEN      (0x03u)
-#define SID_2E_MIN_LEN      (0x04u)
+#define SID_2E_MIN_LEN      (0x02u)
 #define SID_14_MIN_LEN      (0x04u) /* 3 Bytes DTC */
 #define SID_19_MIN_LEN      (0x02u)
 #define SID_2F_MIN_LEN      (0x04u)

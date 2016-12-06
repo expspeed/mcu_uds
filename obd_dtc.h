@@ -126,5 +126,51 @@ uds_load_obddtc (void);
  */
 void
 uds_save_obddtc (void);
+/**
+ * clear_dtc_by_group - clear dtc data by group
+ *
+ * @dtc_buf : the dest buf to store dtc data
+ * @buf_len : the len of the buf
+ *
+ * returns:
+ *     dtc data len
+ */
+void
+clear_dtc_by_group (uint32_t group);
+/**
+ * get_dtc_number_by_status_mask - get dtc number by status mask
+ *
+ * @st_mask : dtc status mask
+ *
+ * returns:
+ *     dtc number
+ */
+uint16_t
+get_dtc_number_by_status_mask (uint8_t st_mask);
+/**
+ * get_dtc_by_status_mask - get dtc by status mask
+ *
+ * @dtc_buf : the dest buf to store dtc data
+ * @buf_len : the len of the buf
+ * @st_mask : dtc status mask
+ *
+ * returns:
+ *     dtc data len
+ */
+uint16_t
+get_dtc_by_status_mask (uint8_t dtc_buf[], uint16_t buf_len, uint8_t st_mask);
+/**
+ * get_supported_dtc - get all supported dtc
+ *
+ * @dtc_buf : the dest buf to store dtc data
+ * @buf_len : the len of the buf
+ *
+ * returns:
+ *     dtc data len
+ */
+uint16_t
+get_supported_dtc (uint8_t dtc_buf[], uint16_t buf_len);
+
+
 #endif
 /****************EOF****************/

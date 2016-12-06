@@ -2,7 +2,7 @@
     \file          uds-net.c
     \author        huanghai
     \mail          huanghai@auto-link.com
-    \version       0.03 - CANoe Test Passed
+    \version       0.03 - CANoe Passed
     \date          2016-09-24
     \description   uds network code, base on ISO 15765
 *******************************************************************************/
@@ -713,7 +713,7 @@ network_send_udsmsg (uint8_t msg_buf[], uint16_t msg_dlc)
 
 	if (msg_dlc == 0 || msg_dlc > UDS_FF_DL_MAX) return;
 
-	if (msg_dlc < UDS_SF_DL_MAX)
+	if (msg_dlc <= UDS_SF_DL_MAX)
     {
 	    send_singleframe (msg_buf, msg_dlc);
     }

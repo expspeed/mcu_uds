@@ -59,7 +59,7 @@ uint8_t HEX_ecu_sn[10] __at(0x20000412);
 uint8_t ASC_VIN[17] __at(0x2000041C);
 uint8_t HEX_tester_sn[10] __at(0x2000042D);
 uint8_t BCD_program_date[3] __at(0x20000437);
-
+uint8_t HEX_ICU_Config[4] __at(0x2000043A);
 
 const uds_rwdata_t rwdata_list[RWDATA_CNT] =
 {
@@ -73,7 +73,8 @@ const uds_rwdata_t rwdata_list[RWDATA_CNT] =
     {0xF195, ASC_soft_ver,         10, UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
     {0xF197, ASC_sys_name,         10, UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
     {0xF198, HEX_tester_sn,        10, UDS_RWDATA_RDWR_INBOOT, UDS_RWDATA_EEPROM}, /* update by tester after program */
-    {0xF199, BCD_program_date,     3,  UDS_RWDATA_RDWR_INBOOT, UDS_RWDATA_EEPROM} /* update by tester after program */
+    {0xF199, BCD_program_date,     3,  UDS_RWDATA_RDWR_INBOOT, UDS_RWDATA_EEPROM}, /* update by tester after program */
+    {0x0100, HEX_ICU_Config,       4,  UDS_RWDATA_RDWR, 	   UDS_RWDATA_EEPROM}
 };
 
 

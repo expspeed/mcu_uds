@@ -84,7 +84,7 @@ typedef struct __UDS_RTCTROL_T__
     uint8_t (* stop_routine) (void);
 }uds_rtctrl_t;
 
-#define RWDATA_CNT  11
+#define RWDATA_CNT  12
 #define IOCTRL_CNT  5
 #define RTCTRL_CNT  1
 extern const uds_rwdata_t rwdata_list[RWDATA_CNT];

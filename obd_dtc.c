@@ -21,35 +21,35 @@
 *******************************************************************************/
 static obd_dtc_para_t obd_dtc_para[OBD_DTC_CNT]=
 {
-    0x04621A,
-    0x04631B,
-    0xF00316,
-    0xF00317,
-    0xC07388,
-    0xC10001,
-    0xC10101,
-    0xC12101,
-    0xC12701,
-    0xC12801,
-    0xC12901,
-    0xC13101,
-    0xC14100,
-    0xC15101,
-    0xC16300,
-    0xC16900,
-    0xC18101,
-    0xC23601,
-    0xC16400,
-    0xC16700,
-    0x953D01,
-    0x953E01,
-    0x953F01,
-    0x954001,
-    0x954101,
-    0x954401,
-    0x954501,
-    0x954601,
-    0x954701
+    0x04621A, 5*2-1, -(5*2),
+    0x04631B, 5*2-1, -(5*2),
+    0xF00316, 5*2-1, -(5*2),
+    0xF00317, 5*2-1, -(5*2),
+    0xC07388, 3*2-1, -(3*2),
+    0xC10001, 5*2-1, -(5*2),
+    0xC10101, 5*2-1, -(5*2),
+    0xC12101, 5*2-1, -(5*2),
+    0xC12701, 5*2-1, -(5*2),
+    0xC12801, 5*2-1, -(5*2),
+    0xC12901, 5*2-1, -(5*2),
+    0xC13101, 5*2-1, -(5*2),
+    0xC14100, 5*2-1, -(5*2),
+    0xC15101, 5*2-1, -(5*2),
+    0xC16300, 5*2-1, -(5*2),
+    0xC16900, 5*2-1, -(5*2),
+    0xC18101, 5*2-1, -(5*2),
+    0xC23601, 5*2-1, -(5*2),
+    0xC16400, 5*2-1, -(5*2),
+    0xC16700, 5*2-1, -(5*2),
+    0x953D01, 5*2-1, -(5*2),
+    0x953E01, 5*2-1, -(5*2),
+    0x953F01, 5*2-1, -(5*2),
+    0x954001, 5*2-1, -(5*2),
+    0x954101, 5*2-1, -(5*2),
+    0x954401, 5*2-1, -(5*2),
+    0x954501, 5*2-1, -(5*2),
+    0x954601, 5*2-1, -(5*2),
+    0x954701, 5*2-1, -(5*2)
 };
 
 static obd_dtc_data_t obd_dtc_data[OBD_DTC_CNT];
@@ -160,13 +160,13 @@ uds_update_obddtc (uint16_t dtc_n, obd_dtc_test_t test_result)
     if (test_result == OBD_DTC_TEST_FAILED)
     {
 
-        if (obd_dtc_data[dtc_n].fdt_cnt < FDT_MAX)
+        if (obd_dtc_data[dtc_n].fdt_cnt < obd_dtc_para[dtc_n].fdt_max)
         {
             if (obd_dtc_data[dtc_n].fdt_cnt < 0)
                 obd_dtc_data[dtc_n].fdt_cnt = 1;
             else
                 obd_dtc_data[dtc_n].fdt_cnt+=2;
-            if (obd_dtc_data[dtc_n].fdt_cnt >= FDT_MAX)
+            if (obd_dtc_data[dtc_n].fdt_cnt >= obd_dtc_para[dtc_n].fdt_max)
             {
                 obd_dtc_data[dtc_n].dtc_st.bit.test_fail = 1;        /*Bit 0*/
                 obd_dtc_data[dtc_n].dtc_st.bit.test_fail_toc = 1;    /*Bit 1*/
@@ -181,11 +181,11 @@ uds_update_obddtc (uint16_t dtc_n, obd_dtc_test_t test_result)
     }
     else
     {
-        if (obd_dtc_data[dtc_n].fdt_cnt > FDT_MIN)
+        if (obd_dtc_data[dtc_n].fdt_cnt > obd_dtc_para[dtc_n].fdt_min)
         {
             obd_dtc_data[dtc_n].fdt_cnt--;
 
-            if (obd_dtc_data[dtc_n].fdt_cnt <= FDT_MIN)
+            if (obd_dtc_data[dtc_n].fdt_cnt <= obd_dtc_para[dtc_n].fdt_min)
             {
                 obd_dtc_data[dtc_n].dtc_st.bit.test_fail = 0;        /*Bit 0*/
                 obd_dtc_data[dtc_n].dtc_st.bit.test_ncmp_slc = 0;    /*Bit 4*/
@@ -340,8 +340,7 @@ get_supported_dtc (uint8_t dtc_buf[], uint16_t buf_len)
     dtc_dlc = 0;
     for (dtc_n = 0; dtc_n < OBD_DTC_CNT; dtc_n++)
     {
-        //dtc_st = obd_dtc_data[dtc_n].dtc_st.all;
-        dtc_st = 0x09;
+        dtc_st = obd_dtc_data[dtc_n].dtc_st.all;       
         if ((dtc_dlc + 4) <= buf_len)
         {
             dtc_buf[dtc_dlc++] = (uint8_t)(obd_dtc_para[dtc_n].dtc_code >> 16);

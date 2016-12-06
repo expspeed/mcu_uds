@@ -33,6 +33,8 @@
 typedef struct __OBD_DTC_PARA_T__
 {
     uint32_t     dtc_code;
+    int16_t      fdt_max;
+    int16_t      fdt_min;
 
 }obd_dtc_para_t;
 
