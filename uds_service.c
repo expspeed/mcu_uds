@@ -949,7 +949,7 @@ uds_service_2F (uint8_t msg_buf[], uint16_t msg_dlc)
 			case UDS_IOCTRL_SHORT_ADJUSTMENT:
 			{
 				vali_par = TRUE;
-				memcpy (ioctrl_list[did_n].p_data, &msg_buf[4], rwdata_list[did_n].dlc);
+				memcpy (ioctrl_list[did_n].p_data, &msg_buf[4], ioctrl_list[did_n].dlc);
 				ioctrl_list[did_n].enable = TRUE;
 				if (ioctrl_list[did_n].init_ioctrl != NULL)
 				    ioctrl_list[did_n].init_ioctrl ();

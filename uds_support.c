@@ -45,36 +45,51 @@ ioctrl_stop_indicator (void);
 uint8_t ASC_boot_ver[10]=
 {'v', 'e', 'r', '-', '0', '.', '0', '1', 0, 0};
 extern uint8_t uds_session;
+#ifdef M12
+uint8_t ASC_ecu_part_num[15]=
+{'3','8','2','0','0','1','0','0','0','2','-','M','1','2',0};
+uint8_t ASC_sys_name[10]=
+{'m', '1', '2', '-', 'I', 'C', 'U', 0, 0, 0};
+#endif
+#ifdef M12E
+uint8_t ASC_ecu_part_num[15]=
+{'3','8','2','0','0','1','0','0','0','1','-','M','1','2',0};
+uint8_t ASC_sys_name[10]=
+{'m', '1', '2', 'e', '-', 'I', 'C', 'U', 0, 0};
+#endif
 uint8_t ASC_sys_supplier_id[5]=
 {'1', '2', '3', '4', '5'};
+uint8_t ASC_hard_ver[10]=
+{'v', 'e', 'r', '-', '0', '.', '0', '1', 0, 0};
 uint8_t ASC_soft_ver[10]=
 {'v', 'e', 'r', '-', '0', '.', '0', '1', 0, 0};
-uint8_t ASC_sys_name[10]=
-{'I', 'C', 'U', '-', 'm', '1', '2', 'e', 0, 0};
 
 
-uint8_t ASC_ecu_part_num[15]  __at(0x20000400);
-uint8_t BCD_manufacture_date[3] __at(0x2000040F);
-uint8_t HEX_ecu_sn[10] __at(0x20000412);
-uint8_t ASC_VIN[17] __at(0x2000041C);
-uint8_t HEX_tester_sn[10] __at(0x2000042D);
-uint8_t BCD_program_date[3] __at(0x20000437);
-uint8_t HEX_ICU_Config[4] __at(0x2000043A);
+
+uint8_t BCD_manufacture_date[3] __at(0x20000400);
+uint8_t HEX_ecu_sn[10] __at(0x20000403);
+uint8_t ASC_VIN[17] __at(0x2000040D);
+uint8_t HEX_tester_sn[10] __at(0x2000041E);
+uint8_t BCD_program_date[3] __at(0x20000428);
+uint8_t HEX_ICU_config[4] __at(0x2000042B);
+uint8_t HEX_clear_maintain[1] __at(0x2000042F);
 
 const uds_rwdata_t rwdata_list[RWDATA_CNT] =
 {
     {0xF183, ASC_boot_ver,         10, UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
     {0xF186, &uds_session,         1,  UDS_RWDATA_RDONLY,      UDS_RWDATA_RAM},
-    {0xF187, ASC_ecu_part_num,     15, UDS_RWDATA_RDWR_INBOOT, UDS_RWDATA_EEPROM},
+    {0xF187, ASC_ecu_part_num,     15, UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
     {0xF18A, ASC_sys_supplier_id,  5,  UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
     {0xF18B, BCD_manufacture_date, 3,  UDS_RWDATA_RDONLY,      UDS_RWDATA_EEPROM}, /* be writen after manufacture */
     {0xF18C, HEX_ecu_sn,           10, UDS_RWDATA_RDONLY,      UDS_RWDATA_EEPROM}, /* be writen after manufacture */
     {0xF190, ASC_VIN,              17, UDS_RWDATA_RDWR_WRONCE, UDS_RWDATA_EEPROM}, /* be writen after installment */
+    {0xF193, ASC_hard_ver,         10, UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
     {0xF195, ASC_soft_ver,         10, UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
     {0xF197, ASC_sys_name,         10, UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
     {0xF198, HEX_tester_sn,        10, UDS_RWDATA_RDWR_INBOOT, UDS_RWDATA_EEPROM}, /* update by tester after program */
     {0xF199, BCD_program_date,     3,  UDS_RWDATA_RDWR_INBOOT, UDS_RWDATA_EEPROM}, /* update by tester after program */
-    {0x0100, HEX_ICU_Config,       4,  UDS_RWDATA_RDWR, 	   UDS_RWDATA_EEPROM}
+    {0x0100, HEX_ICU_config,       4,  UDS_RWDATA_RDWR, 	   UDS_RWDATA_EEPROM},
+    {0x0101, HEX_clear_maintain,   1,  UDS_RWDATA_RDWR, 	   UDS_RWDATA_EEPROM}
 };
 
 
