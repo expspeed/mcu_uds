@@ -80,8 +80,8 @@ const uds_rwdata_t rwdata_list[RWDATA_CNT] =
     {0xF186, &uds_session,         1,  UDS_RWDATA_RDONLY,      UDS_RWDATA_RAM},
     {0xF187, ASC_ecu_part_num,     15, UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
     {0xF18A, ASC_sys_supplier_id,  5,  UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
-    {0xF18B, BCD_manufacture_date, 3,  UDS_RWDATA_RDONLY,      UDS_RWDATA_EEPROM}, /* be writen after manufacture */
-    {0xF18C, HEX_ecu_sn,           10, UDS_RWDATA_RDONLY,      UDS_RWDATA_EEPROM}, /* be writen after manufacture */
+    {0xF18B, BCD_manufacture_date, 3,  UDS_RWDATA_RDWR,        UDS_RWDATA_EEPROM}, /* be writen after manufacture */
+    {0xF18C, HEX_ecu_sn,           10, UDS_RWDATA_RDWR,        UDS_RWDATA_EEPROM}, /* be writen after manufacture */
     {0xF190, ASC_VIN,              17, UDS_RWDATA_RDWR_WRONCE, UDS_RWDATA_EEPROM}, /* be writen after installment */
     {0xF193, ASC_hard_ver,         10, UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
     {0xF195, ASC_soft_ver,         10, UDS_RWDATA_RDONLY,      UDS_RWDATA_DFLASH},
