@@ -494,7 +494,7 @@ uds_service_27 (uint8_t msg_buf[], uint16_t msg_dlc)
 			{
 				uds_negative_rsp (SID_27,NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED);
 			}
-			req_seed = 1;
+			req_seed = ((curr_sa == UDS_SA_LV1)?0:1);
 			rsp_buf[0] = USD_GET_POSITIVE_RSP (SID_27);
 			rsp_buf[1] = subfunction;
 			for (i = 0; i < UDS_SEED_LENGTH; i++) {
@@ -542,6 +542,12 @@ uds_service_27 (uint8_t msg_buf[], uint16_t msg_dlc)
 			break;
 	}
 	//uds_negative_rsp (SID_27,NRC_CONDITIONS_NOT_CORRECT);
+	/**
+	 0.如果已经处于解锁状态，再次请求seed，此时应返回4个0
+	   并且req_seed应该设置为0，这样再次发送密钥时返回NRC 24，而不是35
+	 1.如果UDS支持02会话，则在APP请求05，06子功能时应返回NRC 7E，在APP请求
+	   03，04，07，08等应返回NRC 12
+	 */
 }
 
 /**
