@@ -22,7 +22,7 @@
 *******************************************************************************/
 
 uint8_t
-rand_u8 (void);
+rand_u8 (uint8_t id);
 
 int
 host_to_canl (uint8_t buf[], uint32_t val);

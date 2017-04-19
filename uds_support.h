@@ -60,8 +60,8 @@ typedef struct __UDS_IOCTRL_T__
     uint8_t default_value;
     uint8_t step;
     bool_t  enable;
-    void (* init_ioctrl) (void);
-    void (* stop_ioctrl) (void);
+    uint8_t (* init_ioctrl) (void);
+    uint8_t (* stop_ioctrl) (void);
 }uds_ioctrl_t;
 
 

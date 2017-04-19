@@ -30,10 +30,10 @@
  *     a uint8
  */
 uint8_t
-rand_u8 (void)
+rand_u8 (uint8_t id)
 {
 	uint32_t ticks;
-	ticks = OSTimeGet();
+	ticks = OSTimeGet() + id;
 	srand(ticks);
 
 	return (rand() % 255);

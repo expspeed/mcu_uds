@@ -78,8 +78,8 @@ static bool_t ssp_flg;
 
 static const uds_service_t uds_service_list[] =
 {
-	{SID_10, SID_10_MIN_LEN, uds_service_10, TRUE,  TRUE, TRUE,  TRUE,  UDS_SA_NON},
-    {SID_11, SID_11_MIN_LEN, uds_service_11, FALSE, TRUE, TRUE,  TRUE,  UDS_SA_NON},
+    {SID_10, SID_10_MIN_LEN, uds_service_10, TRUE,  TRUE, TRUE,  TRUE,  UDS_SA_NON},
+    {SID_11, SID_11_MIN_LEN, uds_service_11, FALSE, TRUE, TRUE,  TRUE,  UDS_SA_LV1},
     {SID_27, SID_27_MIN_LEN, uds_service_27, FALSE, TRUE, FALSE, FALSE, UDS_SA_NON},
     {SID_28, SID_28_MIN_LEN, uds_service_28, FALSE, TRUE, TRUE,  TRUE,  UDS_SA_NON},
     {SID_3E, SID_3E_MIN_LEN, uds_service_3E, TRUE,  TRUE, TRUE,  TRUE,  UDS_SA_NON},
@@ -265,6 +265,7 @@ uds_check_len (uint8_t msg_buf[], uint16_t msg_dlc)
 {
 	bool_t result;
 	uint8_t subfunction;
+	uint8_t ioctrl_param;
 	uint8_t sid;
 	sid = msg_buf[0];
 
@@ -345,10 +346,17 @@ uds_check_len (uint8_t msg_buf[], uint16_t msg_dlc)
 		break;
 		case SID_2F:
 		{
-			if (msg_dlc > SID_2F_MIN_LEN)
-			    result = TRUE;
+			ioctrl_param = msg_buf[3];
+			if ((ioctrl_param == UDS_IOCTRL_RETURN_TO_ECU && msg_dlc != SID_2F_MIN_LEN) ||
+				(ioctrl_param == UDS_IOCTRL_SHORT_ADJUSTMENT && msg_dlc != (SID_2F_MIN_LEN + 2) && msg_dlc != (SID_2F_MIN_LEN + 6)))
+			{
+				result = FALSE;
+			}
 			else
-			    result = FALSE;
+			{
+				result = TRUE;
+			}
+
 		}
 		break;
 		case SID_28:
@@ -493,6 +501,7 @@ uds_service_27 (uint8_t msg_buf[], uint16_t msg_dlc)
 			if (uds_timer_chk (UDS_TIMER_FSA) > 0)
 			{
 				uds_negative_rsp (SID_27,NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED);
+				break;
 			}
 			req_seed = ((curr_sa == UDS_SA_LV1)?0:1);
 			rsp_buf[0] = USD_GET_POSITIVE_RSP (SID_27);
@@ -501,7 +510,7 @@ uds_service_27 (uint8_t msg_buf[], uint16_t msg_dlc)
 				if (curr_sa == UDS_SA_LV1)
 					org_seed_buf[i] = 0;
 				else
-				    org_seed_buf[i] = rand_u8();
+				    org_seed_buf[i] = rand_u8(i);
 				rsp_buf[2+i] = org_seed_buf[i];
 			}
 			uds_positive_rsp (rsp_buf,UDS_SEED_LENGTH+2);
@@ -517,12 +526,17 @@ uds_service_27 (uint8_t msg_buf[], uint16_t msg_dlc)
 				break;
 			}
 			req_seed = 0;
+#if 0
+            if (1)
+#else
 			if (!uds_security_access (&msg_buf[2], org_seed_buf))
+#endif
 			{
 				rsp_buf[0] = USD_GET_POSITIVE_RSP (SID_27);
 				rsp_buf[1] = subfunction;
 				uds_positive_rsp (rsp_buf,2);
 				curr_sa = UDS_SA_LV1;
+				uds_fsa_cnt = 0;
 				//printf_os("SA_ PASS\r\n");
 			}
 			else
@@ -858,7 +872,7 @@ uds_service_19 (uint8_t msg_buf[], uint16_t msg_dlc)
 			dtc_count = get_dtc_number_by_status_mask (dtc_status_mask);
 			rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_19);
 			rsp_buf[1] = subfunction;
-			rsp_buf[2] = DTC_AVAILABILITY_STATUS_MASK;
+			rsp_buf[2] = DTC_AVAILABILITY_STATUS_MASK&dtc_status_mask;
 			rsp_buf[3] = DTC_FORMAT_14229;
 			host_to_cans (&rsp_buf[4], dtc_count);
 			uds_positive_rsp (rsp_buf,6);
@@ -871,7 +885,7 @@ uds_service_19 (uint8_t msg_buf[], uint16_t msg_dlc)
 			dtc_status_mask = msg_buf[2];
 			rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_19);
 		    rsp_buf[1] = subfunction;
-		    rsp_buf[2] = DTC_AVAILABILITY_STATUS_MASK;
+		    rsp_buf[2] = DTC_AVAILABILITY_STATUS_MASK&dtc_status_mask;
 		    dtc_dlc = get_dtc_by_status_mask (&rsp_buf[3], UDS_RSP_LEN_MAX-3, dtc_status_mask);
 		    uds_positive_rsp (rsp_buf, 3+dtc_dlc);
 		    break;
@@ -913,6 +927,7 @@ uds_service_2F (uint8_t msg_buf[], uint16_t msg_dlc)
 {
 	uint8_t rsp_buf[8];
 	uint8_t ioctrl_param;
+	uint8_t ioctrl_ret;
 	uint16_t did;
     uint16_t did_n;
 	bool_t find_did;
@@ -922,13 +937,6 @@ uds_service_2F (uint8_t msg_buf[], uint16_t msg_dlc)
 	did |= msg_buf[2];
 	ioctrl_param = msg_buf[3];
 
-
-    if ((ioctrl_param == UDS_IOCTRL_RETURN_TO_ECU && msg_dlc != 4) ||
-	    (ioctrl_param == UDS_IOCTRL_SHORT_ADJUSTMENT && msg_dlc < (2 + 4)))
-	{
-		uds_negative_rsp (SID_2F,NRC_INVALID_MESSAGE_LENGTH_OR_FORMAT);
-		return;
-	}
 	find_did = FALSE;
 	for (did_n = 0; did_n < IOCTRL_NUM; did_n++)
 	{
@@ -949,7 +957,7 @@ uds_service_2F (uint8_t msg_buf[], uint16_t msg_dlc)
 				vali_par = TRUE;
 				ioctrl_list[did_n].enable = FALSE;
 				if (ioctrl_list[did_n].stop_ioctrl != NULL)
-				    ioctrl_list[did_n].stop_ioctrl ();
+				    ioctrl_ret = ioctrl_list[did_n].stop_ioctrl ();
 				break;
 			}
 			case UDS_IOCTRL_SHORT_ADJUSTMENT:
@@ -958,7 +966,7 @@ uds_service_2F (uint8_t msg_buf[], uint16_t msg_dlc)
 				memcpy (ioctrl_list[did_n].p_data, &msg_buf[4], ioctrl_list[did_n].dlc);
 				ioctrl_list[did_n].enable = TRUE;
 				if (ioctrl_list[did_n].init_ioctrl != NULL)
-				    ioctrl_list[did_n].init_ioctrl ();
+				    ioctrl_ret = ioctrl_list[did_n].init_ioctrl ();
 				break;
 			}
 			default:
@@ -971,10 +979,10 @@ uds_service_2F (uint8_t msg_buf[], uint16_t msg_dlc)
 		rsp_buf[2] = msg_buf[2];
 		rsp_buf[3] = msg_buf[3];
 
-		if (vali_par == TRUE)
+		if (vali_par == TRUE && ioctrl_ret == 0x00)
 			uds_positive_rsp (rsp_buf,4);
 		else
-			uds_negative_rsp (SID_2F,NRC_GENERAL_REJECT);
+			uds_negative_rsp (SID_2F,NRC_REQUEST_OUT_OF_RANGE);
 	}
 	else
 	{
@@ -1237,10 +1245,7 @@ uds_main (void)
 	}
 
 
-	if (uds_timer_run (UDS_TIMER_FSA) < 0)
-	{
-        uds_fsa_cnt = 0;
-	}
+	uds_timer_run (UDS_TIMER_FSA);
 
 }
 
@@ -1258,9 +1263,10 @@ uds_init (void)
 {
     nt_usdata_t usdata;
 
-	uds_session = UDS_SESSION_STD;
-	uds_ioctrl_allstop();
-    uds_load_rwdata ();	
+    uds_session = UDS_SESSION_STD;
+    uds_ioctrl_allstop();
+    uds_load_rwdata ();
+    uds_timer_start (UDS_TIMER_FSA);	
     usdata.ffindication = uds_dataff_indication;
     usdata.indication = uds_data_indication;
     usdata.confirm = uds_data_confirm;

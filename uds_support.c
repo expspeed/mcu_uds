@@ -19,25 +19,25 @@
 *******************************************************************************/
 static uint8_t
 rtctrl_nothing (void);
-static void
+static uint8_t
 ioctrl_init_backlight (void);
-static void
+static uint8_t
 ioctrl_stop_backlight (void);
-static void
+static uint8_t
 ioctrl_init_buzzer (void);
-static void
+static uint8_t
 ioctrl_stop_buzzer (void);
-static void
+static uint8_t
 ioctrl_init_gages (void);
-static void
+static uint8_t
 ioctrl_stop_gages (void);
-static void
+static uint8_t
 ioctrl_init_display (void);
-static void
+static uint8_t
 ioctrl_stop_display (void);
-static void
+static uint8_t
 ioctrl_init_indicator (void);
-static void
+static uint8_t
 ioctrl_stop_indicator (void);
 /*******************************************************************************
     Global Varaibles
@@ -141,15 +141,17 @@ rtctrl_nothing (void)
  * returns:
  *     void
  */
-static void
+static uint8_t
 ioctrl_init_backlight (void)
 {
     //mcuctrl_set_backlight (backlight_level[0], backlight_level[1]);
+    return 0;
 }
-static void
+static uint8_t
 ioctrl_stop_backlight (void)
 {
     //mcuctrl_end_backlight ();
+    return 0;
 }
 
 /**
@@ -160,16 +162,18 @@ ioctrl_stop_backlight (void)
  * returns:
  *     void
  */
-static void
+static uint8_t
 ioctrl_init_buzzer (void)
 {
     //mcuctrl_set_buzzer (buzzer[0], buzzer[1]);
+    return 0;
 }
 
-static void
+static vouint8_tid
 ioctrl_stop_buzzer (void)
 {
     //mcuctrl_end_buzzer (buzzer[0], buzzer[1]);
+    return 0;
 }
 
 /**
@@ -180,16 +184,18 @@ ioctrl_stop_buzzer (void)
  * returns:
  *     void
  */
-static void
+static uint8_t
 ioctrl_init_gages (void)
 {
     //mcuctrl_set_gages (gages[0], gages[1]);
+    return 0;
 }
 
-static void
+static uint8_t
 ioctrl_stop_gages (void)
 {
     //mcuctrl_end_gages (gages[0], gages[1]);
+    return 0;
 }
 
 /**
@@ -200,16 +206,18 @@ ioctrl_stop_gages (void)
  * returns:
  *     void
  */
-static void
+static uint8_t
 ioctrl_init_display (void)
 {
     //mcuctrl_set_display (segment_disp[0], segment_disp[1]);
+    return 0;
 }
 
-static void
+static uint8_t
 ioctrl_stop_display (void)
 {
     //mcuctrl_end_display (segment_disp[0], segment_disp[1]);
+    return 0;
 }
 
 /**
@@ -220,16 +228,18 @@ ioctrl_stop_display (void)
  * returns:
  *     void
  */
-static void
+static uint8_t
 ioctrl_init_indicator (void)
 {
     //mcuctrl_set_indicator (indicator);
+    return 0;
 }
 
-static void
+static uint8_t
 ioctrl_stop_indicator (void)
 {
     //mcuctrl_end_indicator (indicator);
+    return 0;
 }
 
 /*******************************************************************************
