@@ -42,7 +42,7 @@ static uint16_t recv_len = 0;
 static uint16_t recv_fdl = 0;  /* frame data len */
 
 
-OS_EVENT *UdsMutex;
+//OS_EVENT *UdsMutex;
 /*******************************************************************************
     external Varaibles
 *******************************************************************************/
@@ -584,7 +584,7 @@ network_main (void)
         g_xcf_sn++;
 		if (g_xcf_sn > 0x0f)
 		    g_xcf_sn = 0;
-        OSMutexPend(UdsMutex,0,&err);
+        //OSMutexPend(UdsMutex,0,&err);
 		send_len = send_consecutiveframe (&remain_buf[remain_pos], remain_len, g_xcf_sn);
 		remain_pos += send_len;
 		remain_len -= send_len;
@@ -616,7 +616,7 @@ network_main (void)
         {
             clear_network ();
         }
-        OSMutexPost(UdsMutex);
+        //OSMutexPost(UdsMutex);
 	}
 }
 /**
@@ -648,7 +648,7 @@ network_recv_frame (uint8_t func_addr, uint8_t frame_buf[], uint8_t frame_dlc)
     else
         g_tatype = N_TATYPE_FUNCTIONAL;
 
-    OSMutexPend(UdsMutex,0,&err);
+    //OSMutexPend(UdsMutex,0,&err);
     pci_type = NT_GET_PCI_TYPE (frame_buf[0]);
     switch(pci_type)
     {
@@ -695,7 +695,7 @@ network_recv_frame (uint8_t func_addr, uint8_t frame_buf[], uint8_t frame_dlc)
         default:
             break;
     }
-    OSMutexPost(UdsMutex);
+    //OSMutexPost(UdsMutex);
 }
 
 /**
@@ -735,12 +735,12 @@ network_send_udsmsg (uint8_t msg_buf[], uint16_t msg_dlc)
 extern int
 network_reg_usdata (nt_usdata_t usdata)
 {
-    uint8_t err;
+    //uint8_t err;
     if (usdata.ffindication == NULL || usdata.indication == NULL || usdata.confirm == NULL) return -1;
 
     N_USData = usdata;
 
-    UdsMutex = OSMutexCreate(5, &err);
+    //UdsMutex = OSMutexCreate(5, &err);
     return 0;
 }
 /****************EOF****************/

@@ -14,6 +14,7 @@
 #include "ucos_ii.h"
 #include "uds_type.h"
 #include "uds_util.h"
+#include "timx.h" 
 /*******************************************************************************
     Type Definition
 *******************************************************************************/
@@ -22,7 +23,7 @@
     Function  Definition
 *******************************************************************************/
 /**
- * rand_u8 - get a random u8
+ * rand_u8 - get a random uint8_t
  *
  * @void  :
  *
@@ -33,7 +34,7 @@ uint8_t
 rand_u8 (uint8_t id)
 {
 	uint32_t ticks;
-	ticks = OSTimeGet() + id;
+	ticks = get_time_ms() + id;
 	srand(ticks);
 
 	return (rand() % 255);
@@ -77,24 +78,127 @@ host_to_cans (uint8_t buf[], uint16_t val)
  * can_to_hostl - transmit  can-net endian buffer to long or short int
  *
  * @buf: ther buffer to be transformed
- * @pval: 
  *
  * returns:
- *     0 - ok, -1 - err
+ *     transformed value
  */
-int
-can_to_hostl (uint8_t buf[], uint32_t *pval)
+uint32_t
+can_to_hostl (const uint8_t buf[])
 {
 	uint32_t val;
-	if (buf == NULL || pval == NULL) return -1;
-
+	if (buf == NULL) return 0;
+#if 0
     val = 0;
 	val |= ((uint32_t)buf[0]) << 24;
 	val |= ((uint32_t)buf[1]) << 16;
 	val |= ((uint32_t)buf[2]) << 8;
 	val |= ((uint32_t)buf[3]) << 0;
-
-    *pval = val;
-	return 0;
+#else
+	val  = ((uint32_t)buf[3]) << 0;
+	val += ((uint32_t)buf[2]) << 8;
+	val += ((uint32_t)buf[1]) << 16;
+	val += ((uint32_t)buf[0]) << 24;
+#endif
+	return val;
 }
+
+
+/**
+ * can_to_littl - transmit  can-net endian buffer to a little endian
+ *
+ * @buf: ther buffer to be transformed
+ *
+ * returns:
+ *     transformed value
+ */
+uint32_t
+can_to_littl (const uint8_t buf[])
+{
+	uint32_t val;
+	if (buf == NULL) return 0;
+
+	val  = ((uint32_t)buf[0]) << 0;
+	val += ((uint32_t)buf[1]) << 8;
+	val += ((uint32_t)buf[2]) << 16;
+	val += ((uint32_t)buf[3]) << 24;
+
+	return val;
+}
+
+/**
+ * crc32_continue - calculate crc32 once time
+ *
+ * @data: start position to be transformed
+ * @len :
+ * returns:
+ *     transformed value
+ */
+uint32_t
+crc32_continue (uint8_t *data, uint32_t len)
+{
+    uint32_t result;
+    uint32_t i,j;
+    uint8_t  octet;
+
+    result = ~CRC32_INIT;
+    
+    for (i=0; i<len; i++)
+    {
+        octet = *(data++);
+        for (j=0; j<8; j++)
+        {
+            if ((octet >> 7) ^ (result >> 31))
+            {
+                result = (result << 1) ^ CRC32_POLY;
+            }
+            else
+            {
+                result = (result << 1);
+            }
+            octet <<= 1;
+        }
+    }
+    
+    return ~result;             /* The complement of the remainder */
+}
+
+/**
+ * crc32_discontinue - calculate crc32 discontinue
+ *
+ * @data: start position to be transformed
+ *
+ * returns:
+ *     transformed value
+ */
+uint32_t
+crc32_discontinue (uint32_t org_rst, uint8_t *data, uint32_t len)
+{
+    uint32_t result;
+    uint32_t i,j;
+    uint8_t  octet;
+
+    result = ~org_rst;
+
+    for (i=0; i<len; i++)
+    {
+        octet = *(data++);
+        for (j=0; j<8; j++)
+        {
+            if ((octet >> 7) ^ (result >> 31))
+            {
+                result = (result << 1) ^ CRC32_POLY;
+            }
+            else
+            {
+                result = (result << 1);
+            }
+            octet <<= 1;
+        }
+    }
+
+    return ~result;             /* The complement of the remainder */
+}
+
+
+
 /****************EOF****************/

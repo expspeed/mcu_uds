@@ -13,7 +13,6 @@
 *******************************************************************************/
 #include <stdint.h>
 #include "network_layer.h"
-
 /*******************************************************************************
     Type Definition
 *******************************************************************************/
@@ -27,6 +26,7 @@
 
 typedef enum __UDS_NRC_ENUM__
 {
+	NRC_NONE = 0,
 	NRC_GENERAL_REJECT=0x10,
 	NRC_SERVICE_NOT_SUPPORTED=0x11,
 	NRC_SUBFUNCTION_NOT_SUPPORTED = 0x12,
@@ -38,8 +38,11 @@ typedef enum __UDS_NRC_ENUM__
     NRC_INVALID_KEY=0x35,
     NRC_EXCEEDED_NUMBER_OF_ATTEMPTS=0x36,
     NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED=0x37,
+	NRC_TRANSFER_DATA_SUSPENDED=0x71,
     NRC_GENERAL_PROGRAMMING_FAILURE=0x72,
+	NRC_WRONG_BLOCK_SEQUENCE_COUNTER=0x73,
     NRC_SERVICE_BUSY=0x78,
+	NRC_SUBFUNCTION_NOT_SUPPORTED_IN_ACTIVE_SESSION=0x7E,
 	NRC_SERVICE_NOT_SUPPORTED_IN_ACTIVE_SESSION=0x7F,
 }uds_nrc_em;
 
@@ -66,6 +69,9 @@ typedef enum __UDS_NRC_ENUM__
 #define SID_2F        (0x2F) /* InputOutputControlID */
 #define SID_28        (0x28) /* CommunicationControl */
 #define SID_31        (0x31) /* RoutineControl */
+#define SID_34        (0x34) /* RequestDownload */
+#define SID_36        (0x36) /* TransferData */
+#define SID_37        (0x37) /* RequestTransferExit */
 #define SID_3E        (0x3E) /* TesterPresent */
 #define SID_85        (0x85) /* ControlDTCSetting */
 
@@ -82,11 +88,15 @@ typedef enum __UDS_NRC_ENUM__
 #define SID_19_MIN_LEN      (0x02u)
 #define SID_2F_MIN_LEN      (0x04u)
 #define SID_31_MIN_LEN      (0x04u)
+#define SID_34_MIN_LEN      (0x0Bu)
+#define SID_36_MIN_LEN      (0x80u)
+#define SID_37_MIN_LEN      (0x01u)
 
 
 #define UDS_GET_SUB_FUNCTION_SUPPRESS_POSRSP(byte)    ((byte >> 7u)&0x01u)
 #define UDS_GET_SUB_FUNCTION(byte)     (byte & 0x7fu)
-
+#define UDS_GET_MEM_SIZE_LEN(byte)     (byte >> 4)
+#define UDS_GET_MEM_ADDR_LEN(byte)     (byte & 0x0fu)
 
 #define POSITIVE_RSP 			0x40
 #define NEGATIVE_RSP 			0x7F
@@ -95,7 +105,9 @@ typedef enum __UDS_NRC_ENUM__
 
 
 #define TIMEOUT_FSA          (10000) /* 10s */
+#define TIMEOUT_FSA_SE       (1000)  /* 1s, for power on */
 #define TIMEOUT_S3server     (5000)  /* 5000ms */
+#define TIMEOUT_P2server_x   (2000)  /* 2000ms, P2*Can_Server*/
 /* uds app layer timer */
 typedef enum __UDS_TIMER_T__
 {
@@ -180,7 +192,6 @@ typedef enum __UDS_ROUTINE_CTRL_TYPE__
 	UDS_ROUTINE_CTRL_REQUEST_RESULT = 0x03
 }uds_routine_ctrl_type;
 
-
 #define DTC_SUPPORT_STATUS                (0x09)
 #define DTC_GROUP_ALL                     (0xFFFFFF)
 
@@ -195,21 +206,47 @@ typedef enum __UDS_ROUTINE_CTRL_TYPE__
 #define UDS_REQUEST_SEED                  (0x01)
 #define UDS_SEND_KEY                      (0x02)
 #define UDS_FAS_MAX_TIMES                 (0x02)  /* failed security access */
-
+#define UDS_REQUEST_SEED_LV2              (0x05)
+#define UDS_SEND_KEY_LV2                  (0x06)
 
 #define ZERO_SUBFUNCTION                  (0x00)
-
-
 
 /*******************************************************************************
     Global Varaibles Extern
 *******************************************************************************/
 extern bool_t dis_normal_xmit;
 extern bool_t dis_normal_recv;
+extern uint8_t uds_session;
 
 /*******************************************************************************
     Function  Extern
 *******************************************************************************/
+/**
+ * uds_chk_session - check the uds session, if in program session, 
+ *                   then send response
+ *
+ * @void :
+ *
+ * returns:
+ *     void
+ * decripstion : this function should be called after 
+ *               uds_init, can_init, load_uds_data
+ */
+extern void
+uds_chk_session (void);
+
+
+/**
+ * uds_negative_rsp - uds negative response
+ *
+ * @sid :
+ * @rsp_nrc :
+ *
+ * returns:
+ *     0 - ok, other - wrong
+ */
+void
+uds_negative_rsp (uint8_t sid, uint8_t rsp_nrc);
 
 /**
  * uds_get_frame - uds get a can frame, then transmit to network

@@ -10,12 +10,15 @@
 /*******************************************************************************
     Include Files
 *******************************************************************************/
+#include <string.h>
 #include "network_layer.h"
 #include "uds_service.h"
 #include "uds_util.h"
 #include "uds_status.h"
 #include "uds_support.h"
 #include "obd_dtc.h"
+#include "uds_program.h"
+#include "iap_util.h"
 /*******************************************************************************
     Type declaration
 *******************************************************************************/
@@ -25,6 +28,7 @@ typedef struct __UDS_SERVICE_T__
     uint8_t uds_min_len;
     void (* uds_service)  (uint8_t *, uint16_t);
     bool_t std_spt;   /* default session support */
+	bool_t pro_spt;   /* programming session support */
     bool_t ext_spt;   /* extended session support */
     bool_t fun_spt;   /* function address support */
 	bool_t ssp_spt;   /* subfunction suppress PosRsp bit support */
@@ -51,13 +55,13 @@ uds_service_22 (uint8_t msg_buf[], uint16_t msg_dlc);
 static void
 uds_service_2E (uint8_t msg_buf[], uint16_t msg_dlc);
 static void
-uds_service_14 (uint8_t msg_buf[], uint16_t msg_dlc);
-static void
-uds_service_19 (uint8_t msg_buf[], uint16_t msg_dlc);
-static void
-uds_service_2F (uint8_t msg_buf[], uint16_t msg_dlc);
-static void
 uds_service_31 (uint8_t msg_buf[], uint16_t msg_dlc);
+static void
+uds_service_34 (uint8_t msg_buf[], uint16_t msg_dlc);
+static void
+uds_service_36 (uint8_t msg_buf[], uint16_t msg_dlc);
+static void
+uds_service_37 (uint8_t msg_buf[], uint16_t msg_dlc);
 
 /*******************************************************************************
     Private Varaibles
@@ -78,27 +82,45 @@ static bool_t ssp_flg;
 
 static const uds_service_t uds_service_list[] =
 {
-    {SID_10, SID_10_MIN_LEN, uds_service_10, TRUE,  TRUE, TRUE,  TRUE,  UDS_SA_NON},
-    {SID_11, SID_11_MIN_LEN, uds_service_11, FALSE, TRUE, TRUE,  TRUE,  UDS_SA_LV1},
-    {SID_27, SID_27_MIN_LEN, uds_service_27, FALSE, TRUE, FALSE, FALSE, UDS_SA_NON},
-    {SID_28, SID_28_MIN_LEN, uds_service_28, FALSE, TRUE, TRUE,  TRUE,  UDS_SA_NON},
-    {SID_3E, SID_3E_MIN_LEN, uds_service_3E, TRUE,  TRUE, TRUE,  TRUE,  UDS_SA_NON},
-    {SID_85, SID_85_MIN_LEN, uds_service_85, FALSE, TRUE, TRUE,  TRUE,  UDS_SA_NON},
-    {SID_22, SID_22_MIN_LEN, uds_service_22, TRUE,  TRUE, TRUE,  FALSE, UDS_SA_NON},
-    {SID_2E, SID_2E_MIN_LEN, uds_service_2E, FALSE, TRUE, FALSE, FALSE, UDS_SA_LV1},
-    {SID_14, SID_14_MIN_LEN, uds_service_14, TRUE,  TRUE, TRUE,  FALSE, UDS_SA_NON},
-    {SID_19, SID_19_MIN_LEN, uds_service_19, TRUE,  TRUE, TRUE,  TRUE,  UDS_SA_NON},
-    {SID_2F, SID_2F_MIN_LEN, uds_service_2F, FALSE, TRUE, FALSE, FALSE, UDS_SA_LV1},
-    {SID_31, SID_31_MIN_LEN, uds_service_31, FALSE, TRUE, FALSE, FALSE, UDS_SA_LV1},
+    {SID_10, SID_10_MIN_LEN, uds_service_10, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  UDS_SA_NON},
+    {SID_11, SID_11_MIN_LEN, uds_service_11, FALSE, TRUE,  TRUE,  TRUE,  TRUE,  UDS_SA_LV1},
+    {SID_27, SID_27_MIN_LEN, uds_service_27, FALSE, TRUE,  FALSE, FALSE, FALSE, UDS_SA_NON},
+    {SID_28, SID_28_MIN_LEN, uds_service_28, FALSE, FALSE, TRUE,  TRUE,  TRUE,  UDS_SA_NON},
+    {SID_3E, SID_3E_MIN_LEN, uds_service_3E, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  UDS_SA_NON},
+    {SID_85, SID_85_MIN_LEN, uds_service_85, FALSE, FALSE, TRUE,  TRUE,  TRUE,  UDS_SA_NON},
+    {SID_22, SID_22_MIN_LEN, uds_service_22, TRUE,  TRUE,  TRUE,  TRUE,  FALSE, UDS_SA_NON},
+    {SID_2E, SID_2E_MIN_LEN, uds_service_2E, FALSE, TRUE,  TRUE,  FALSE, FALSE, UDS_SA_LV1},
+    {SID_31, SID_31_MIN_LEN, uds_service_31, FALSE, TRUE,  FALSE, FALSE, FALSE, UDS_SA_LV2},
+    {SID_34, SID_31_MIN_LEN, uds_service_34, FALSE, TRUE,  FALSE, FALSE, FALSE, UDS_SA_LV2},
+    {SID_36, SID_31_MIN_LEN, uds_service_36, FALSE, TRUE,  FALSE, FALSE, FALSE, UDS_SA_LV2},
+    {SID_37, SID_31_MIN_LEN, uds_service_37, FALSE, TRUE,  FALSE, FALSE, FALSE, UDS_SA_LV2},
 };
 
 #define UDS_SERVICE_NUM (sizeof (uds_service_list) / sizeof (uds_service_t))
+
+/* for data download */
+
+static uint32_t start_mem_addr = 0;
+static uint32_t total_mem_size = 0;
+static uint32_t total_recv_len = 0;
+
+static uint8_t  local_sn = 1;
 
 /*******************************************************************************
     Global Varaibles
 *******************************************************************************/
 bool_t dis_normal_xmit;
 bool_t dis_normal_recv;
+
+uds_prog_t uds_prog_st = UDS_PROG_NONE;
+uint32_t crc32_calc = 0;
+
+#ifdef UDS_INTEG_DATA
+/* reserved data */
+uint8_t software_integrity_status = 0x01;
+uint8_t software_compatibility_status = 0x01;
+#endif
+
 /*******************************************************************************
     Function  Definition
 *******************************************************************************/
@@ -119,6 +141,18 @@ uds_timer_start (uint8_t num)
         uds_timer[UDS_TIMER_FSA] = TIMEOUT_FSA;
 	if (num == UDS_TIMER_S3server)
 	    uds_timer[UDS_TIMER_S3server] = TIMEOUT_S3server;
+}
+
+static void
+uds_timer_start_se (uint8_t num)
+{
+	if (num >= UDS_TIMER_CNT) return;
+
+	if (num == UDS_TIMER_FSA)
+        uds_timer[UDS_TIMER_FSA] = TIMEOUT_FSA_SE;
+	if (num == UDS_TIMER_S3server)
+	    uds_timer[UDS_TIMER_S3server] = TIMEOUT_S3server;
+
 }
 
 
@@ -202,7 +236,7 @@ uds_no_response (void)
  * returns:
  *     0 - ok, other - wrong
  */
-static void
+void
 uds_negative_rsp (uint8_t sid, uint8_t rsp_nrc)
 {
 	uint8_t temp_buf[8] = {0};
@@ -269,7 +303,7 @@ uds_check_len (uint8_t msg_buf[], uint16_t msg_dlc)
 	uint8_t sid;
 	sid = msg_buf[0];
 
-	if (msg_dlc < 2)
+	if (msg_dlc < 1)
 	    return FALSE;
 
 	subfunction = UDS_GET_SUB_FUNCTION (msg_buf[1]);
@@ -369,7 +403,45 @@ uds_check_len (uint8_t msg_buf[], uint16_t msg_dlc)
 		break;
 		case SID_31:
 		{
-			if (msg_dlc > SID_31_MIN_LEN)
+			if (msg_dlc >= SID_31_MIN_LEN)
+			    result = TRUE;
+			else
+			    result = FALSE;
+		}
+		break;
+		case SID_34:
+		{
+			if (msg_dlc == SID_34_MIN_LEN)
+			    result = TRUE;
+			else
+			    result = FALSE;
+		}
+		break;
+		case SID_36:
+		{
+			/**
+			 msg dlc of $36 must be UDS_MAX_NUM_BLOCK_LEN,
+			 it should be filled with 0 on the end of the last block
+			 */
+			if ((total_mem_size - total_recv_len) >= UDS_MAX_NUM_BLOCK_LEN)
+			{
+			    if (msg_dlc == (UDS_MAX_NUM_BLOCK_LEN + 2))
+			        result = TRUE;
+			    else
+			        result = FALSE;
+		  }
+			else
+			{
+			    if (msg_dlc == (total_mem_size - total_recv_len + 2))
+			        result = TRUE;
+			    else
+			        result = FALSE;
+			}
+		}
+		break;
+		case SID_37:
+		{
+			if (msg_dlc == SID_37_MIN_LEN)
 			    result = TRUE;
 			else
 			    result = FALSE;
@@ -412,6 +484,7 @@ uds_service_10 (uint8_t msg_buf[], uint16_t msg_dlc)
 {
     uint8_t subfunction;
 	uint8_t rsp_buf[8];
+	uds_nrc_em  ret_nrc;
 
 	subfunction = UDS_GET_SUB_FUNCTION (msg_buf[1]);
 
@@ -421,22 +494,20 @@ uds_service_10 (uint8_t msg_buf[], uint16_t msg_dlc)
 	rsp_buf[3] = (uint8_t)(P2_SERVER & 0x00ff);
 	rsp_buf[4] = (uint8_t)(P2X_SERVER >> 8);
 	rsp_buf[5] = (uint8_t)(P2X_SERVER & 0x00ff);
-	switch (subfunction)
+
+	ret_nrc = uds_session_check (uds_session, subfunction);
+	if (ret_nrc == NRC_NONE)
 	{
-		case UDS_SESSION_STD:
-			curr_sa = UDS_SA_NON;
-			uds_session = (uds_session_t)subfunction;
-			uds_positive_rsp (rsp_buf, 6);
-			break;
-		case UDS_SESSION_EOL:
-			curr_sa = UDS_SA_NON;
-			uds_session = (uds_session_t)subfunction;
-			uds_positive_rsp (rsp_buf, 6);
-            uds_timer_start (UDS_TIMER_S3server);
-			break;
-		default:
-			uds_negative_rsp (SID_10,NRC_SUBFUNCTION_NOT_SUPPORTED);
-			break;
+		uds_prog_st = UDS_PROG_NONE;
+		curr_sa = UDS_SA_NON;
+		uds_session = (uds_session_t)subfunction;
+		uds_positive_rsp (rsp_buf, 6);
+		if (subfunction == UDS_SESSION_PROG || subfunction == UDS_SESSION_EOL)
+		    uds_timer_start (UDS_TIMER_S3server);
+	}
+	else
+	{
+		uds_negative_rsp (SID_10,ret_nrc);
 	}
     //uds_negative_rsp (SID_10,NRC_CONDITIONS_NOT_CORRECT);
 }
@@ -463,11 +534,8 @@ uds_service_11 (uint8_t msg_buf[], uint16_t msg_dlc)
 		rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_11);
 		rsp_buf[1] = UDS_RESET_HARD;
 		uds_positive_rsp (rsp_buf,2);
-		//wait for reset
-	   /**
-		for (;;)
-		{}
-		*/
+		//set reset flag
+		mcu_reset_start (MCU_RESET_FAST_TIMOUT);
 	}
 	else
 	{
@@ -497,17 +565,24 @@ uds_service_27 (uint8_t msg_buf[], uint16_t msg_dlc)
 	switch (subfunction)
 	{
 		case UDS_REQUEST_SEED:
+		case UDS_SEND_KEY:
+		{
+			uds_negative_rsp (SID_27,NRC_SUBFUNCTION_NOT_SUPPORTED_IN_ACTIVE_SESSION);
+			break;
+		}
+
+		case UDS_REQUEST_SEED_LV2:
 		{
 			if (uds_timer_chk (UDS_TIMER_FSA) > 0)
 			{
 				uds_negative_rsp (SID_27,NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED);
 				break;
 			}
-			req_seed = ((curr_sa == UDS_SA_LV1)?0:1);
+			req_seed = ((curr_sa == UDS_SA_LV2)?0:1);
 			rsp_buf[0] = USD_GET_POSITIVE_RSP (SID_27);
 			rsp_buf[1] = subfunction;
 			for (i = 0; i < UDS_SEED_LENGTH; i++) {
-				if (curr_sa == UDS_SA_LV1)
+				if (curr_sa == UDS_SA_LV2)
 					org_seed_buf[i] = 0;
 				else
 				    org_seed_buf[i] = rand_u8(i);
@@ -518,7 +593,7 @@ uds_service_27 (uint8_t msg_buf[], uint16_t msg_dlc)
 			//printf_os("SecurityAccess seed:%d %d %d %d\r\n",org_seed_buf[0], org_seed_buf[1], org_seed_buf[2], org_seed_buf[3],);
 			break;
 		}
-		case UDS_SEND_KEY:
+		case UDS_SEND_KEY_LV2:
 		{
 			if (req_seed == 0)
 			{
@@ -535,7 +610,7 @@ uds_service_27 (uint8_t msg_buf[], uint16_t msg_dlc)
 				rsp_buf[0] = USD_GET_POSITIVE_RSP (SID_27);
 				rsp_buf[1] = subfunction;
 				uds_positive_rsp (rsp_buf,2);
-				curr_sa = UDS_SA_LV1;
+				curr_sa = UDS_SA_LV2;
 				uds_fsa_cnt = 0;
 				//printf_os("SA_ PASS\r\n");
 			}
@@ -784,7 +859,7 @@ uds_service_2E (uint8_t msg_buf[], uint16_t msg_dlc)
 			rsp_buf[1] = msg_buf[1];
 			rsp_buf[2] = msg_buf[2];
 			memcpy (rwdata_list[did_n].p_data, &msg_buf[3], rwdata_list[did_n].dlc);
-			write_len = eeprom_write ();
+			write_len = uds_save_rwdata ();
 			break;
 		}
 	}
@@ -811,186 +886,6 @@ uds_service_2E (uint8_t msg_buf[], uint16_t msg_dlc)
     //uds_negative_rsp (SID_2E,NRC_CONDITIONS_NOT_CORRECT);
 }
 
-/**
- * uds_service_14 - uds service 0x14, ClearDiagnosticInformation
- *
- * @msg_buf :
- * @msg_dlc :
- *
- * returns:
- *     void
- */
-static void
-uds_service_14 (uint8_t msg_buf[], uint16_t msg_dlc)
-{
-	uint8_t rsp_buf[8];
-	uint32_t dtc_group;
-	dtc_group = 0;
-	dtc_group |= ((uint32_t)msg_buf[1]) << 16;
-	dtc_group |= ((uint32_t)msg_buf[2]) << 8;
-	dtc_group |= ((uint32_t)msg_buf[3]) << 0;
-
-	if (dtc_group == UDS_DTC_GROUP_ALL)
-	{
-		/* clear all groups dtc */
-		clear_dtc_by_group (dtc_group);
-		rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_14);
-		uds_positive_rsp (rsp_buf,1);
-	}
-	else
-	{
-		uds_negative_rsp (SID_14,NRC_REQUEST_OUT_OF_RANGE);
-	}	
-    //uds_negative_rsp (SID_14,NRC_CONDITIONS_NOT_CORRECT);
-}
-
-
-/**
- * uds_service_19 - uds service 0x19, ReadDTCInformation
- *
- * @msg_buf :
- * @msg_dlc :
- *
- * returns:
- *     void
- */
-static void
-uds_service_19 (uint8_t msg_buf[], uint16_t msg_dlc)
-{
-	uint8_t subfunction;
-    uint8_t rsp_buf[UDS_RSP_LEN_MAX];
-
-	subfunction = UDS_GET_SUB_FUNCTION (msg_buf[1]);
-
-    switch (subfunction)
-	{
-		case REPORT_DTC_NUMBER_BY_STATUS_MASK:
-		{
-			uint8_t dtc_status_mask;
-			uint16_t dtc_count;
-			dtc_status_mask = msg_buf[2];
-			dtc_count = get_dtc_number_by_status_mask (dtc_status_mask);
-			rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_19);
-			rsp_buf[1] = subfunction;
-			rsp_buf[2] = DTC_AVAILABILITY_STATUS_MASK&dtc_status_mask;
-			rsp_buf[3] = DTC_FORMAT_14229;
-			host_to_cans (&rsp_buf[4], dtc_count);
-			uds_positive_rsp (rsp_buf,6);
-		    break;
-		}
-		case REPORT_DTC_BY_STATUS_MASK:
-		{
-			uint8_t dtc_status_mask;
-			uint16_t dtc_dlc;
-			dtc_status_mask = msg_buf[2];
-			rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_19);
-		    rsp_buf[1] = subfunction;
-		    rsp_buf[2] = DTC_AVAILABILITY_STATUS_MASK&dtc_status_mask;
-		    dtc_dlc = get_dtc_by_status_mask (&rsp_buf[3], UDS_RSP_LEN_MAX-3, dtc_status_mask);
-		    uds_positive_rsp (rsp_buf, 3+dtc_dlc);
-		    break;
-		}
-		case REPORT_DTC_SNOPSHOT_BY_DTC_NUMBER:
-		    uds_negative_rsp (SID_19,NRC_SUBFUNCTION_NOT_SUPPORTED);
-		    break;
-		case REPORT_DTC_EXTENDED_DATA_RECORD_BY_DTC_NUMBER:
-		    uds_negative_rsp (SID_19,NRC_SUBFUNCTION_NOT_SUPPORTED);
-		    break;
-		case REPORT_SUPPORTED_DTC:
-		{
-			uint16_t dtc_dlc;
-			rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_19);
-		    rsp_buf[1] = subfunction;
-		    rsp_buf[2] = DTC_AVAILABILITY_STATUS_MASK;
-		    dtc_dlc = get_supported_dtc (&rsp_buf[3], UDS_RSP_LEN_MAX-3);
-		    uds_positive_rsp (rsp_buf, 3+dtc_dlc);
-		    break;
-		}
-		default:
-	        uds_negative_rsp (SID_19,NRC_SUBFUNCTION_NOT_SUPPORTED);
-		    break;
-	}
-
-}
-
-/**
- * uds_service_2F - uds service 0x2F, InputOutputControlByIdentifier
- *
- * @msg_buf :
- * @msg_dlc :
- *
- * returns:
- *     void
- */
-static void
-uds_service_2F (uint8_t msg_buf[], uint16_t msg_dlc)
-{
-	uint8_t rsp_buf[8];
-	uint8_t ioctrl_param;
-	uint8_t ioctrl_ret;
-	uint16_t did;
-    uint16_t did_n;
-	bool_t find_did;
-	bool_t vali_par;
-
-	did = ((uint16_t)msg_buf[1]) << 8;
-	did |= msg_buf[2];
-	ioctrl_param = msg_buf[3];
-
-	find_did = FALSE;
-	for (did_n = 0; did_n < IOCTRL_NUM; did_n++)
-	{
-		if (ioctrl_list[did_n].did == did)
-		{
-			find_did = TRUE;
-			break;
-		}
-	}
-
-	if (find_did == TRUE)
-	{
-		vali_par = FALSE;
-		switch (ioctrl_param)
-		{
-			case UDS_IOCTRL_RETURN_TO_ECU:
-			{
-				vali_par = TRUE;
-				ioctrl_list[did_n].enable = FALSE;
-				if (ioctrl_list[did_n].stop_ioctrl != NULL)
-				    ioctrl_ret = ioctrl_list[did_n].stop_ioctrl ();
-				break;
-			}
-			case UDS_IOCTRL_SHORT_ADJUSTMENT:
-			{
-				vali_par = TRUE;
-				memcpy (ioctrl_list[did_n].p_data, &msg_buf[4], ioctrl_list[did_n].dlc);
-				ioctrl_list[did_n].enable = TRUE;
-				if (ioctrl_list[did_n].init_ioctrl != NULL)
-				    ioctrl_ret = ioctrl_list[did_n].init_ioctrl ();
-				break;
-			}
-			default:
-				vali_par = FALSE;
-				break;
-		}
-
-		rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_2F);
-		rsp_buf[1] = msg_buf[1];
-		rsp_buf[2] = msg_buf[2];
-		rsp_buf[3] = msg_buf[3];
-
-		if (vali_par == TRUE && ioctrl_ret == 0x00)
-			uds_positive_rsp (rsp_buf,4);
-		else
-			uds_negative_rsp (SID_2F,NRC_REQUEST_OUT_OF_RANGE);
-	}
-	else
-	{
-	    uds_negative_rsp (SID_2F,NRC_REQUEST_OUT_OF_RANGE);
-	}
-
-    //uds_negative_rsp (SID_2F,NRC_CONDITIONS_NOT_CORRECT);
-}
 
 /**
  * uds_service_31 - uds service 0x31, RoutineControl
@@ -1006,6 +901,7 @@ uds_service_31 (uint8_t msg_buf[], uint16_t msg_dlc)
 {
     uint8_t subfunction;
 	uint8_t rsp_buf[8];
+	uint8_t ret;
 	uint16_t rid;
 	uint16_t rid_n;
 	bool_t find_rid;
@@ -1020,6 +916,7 @@ uds_service_31 (uint8_t msg_buf[], uint16_t msg_dlc)
 		if (rtctrl_list[rid_n].rid == rid)
 		{
 			find_rid = TRUE;
+			memcpy (rtctrl_list[rid_n].p_data, &msg_buf[4], rtctrl_list[rid_n].dlc);
 			break;
 		}
 	}
@@ -1033,14 +930,18 @@ uds_service_31 (uint8_t msg_buf[], uint16_t msg_dlc)
 		case UDS_ROUTINE_CTRL_START:
 		    if (find_rid == TRUE)
 			{
-                if (rtctrl_list[rid_n].rtst == UDS_RT_ST_RUNNING)
+                if (rtst_list[rid_n] == UDS_RT_ST_RUNNING)
 				{
                     uds_negative_rsp (SID_31,NRC_REQUEST_SEQUENCE_ERROR);
 				}
 				else
 				{
-					rtctrl_list[rid_n].init_routine ();
-					uds_positive_rsp (rsp_buf,4);
+					ret = rtctrl_list[rid_n].init_routine ();
+					rsp_buf[4] = ((rtst_list[rid_n] == UDS_RT_ST_FAILED)?0x01:0x00);
+					if (ret == 0)
+					    uds_positive_rsp (rsp_buf,5);
+					else
+					    uds_negative_rsp (SID_31,ret);
 				}
 			}
 			else
@@ -1051,7 +952,7 @@ uds_service_31 (uint8_t msg_buf[], uint16_t msg_dlc)
 		case UDS_ROUTINE_CTRL_STOP:
 		    if (find_rid == TRUE)
 			{
-                if (rtctrl_list[rid_n].rtst == UDS_RT_ST_IDLE)
+                if (rtst_list[rid_n] == UDS_RT_ST_IDLE)
 				{
                     uds_negative_rsp (SID_31,NRC_REQUEST_SEQUENCE_ERROR);
 				}
@@ -1069,13 +970,13 @@ uds_service_31 (uint8_t msg_buf[], uint16_t msg_dlc)
 		case UDS_ROUTINE_CTRL_REQUEST_RESULT:
 		    if (find_rid == TRUE)
 			{
-                if (rtctrl_list[rid_n].rtst == UDS_RT_ST_IDLE)
+                if (rtst_list[rid_n] == UDS_RT_ST_IDLE)
 				{
                     uds_negative_rsp (SID_31,NRC_REQUEST_SEQUENCE_ERROR);
 				}
 				else
 				{
-					rsp_buf[4] = (uint8_t)rtctrl_list[rid_n].rtst;
+					rsp_buf[4] = (uint8_t)rtst_list[rid_n];
 				}
 			}
 			else
@@ -1088,6 +989,182 @@ uds_service_31 (uint8_t msg_buf[], uint16_t msg_dlc)
 		    break;
 	}
     //uds_negative_rsp (SID_2F,NRC_CONDITIONS_NOT_CORRECT);
+}
+
+
+/**
+ * download_request_valid - check the download request
+ *
+ * @void : 
+ *
+ * returns:
+ *     void
+ */
+static bool_t
+download_request_valid (uint32_t start_addr, uint32_t end_addr)
+{
+    bool_t ret;
+
+    if (uds_prog_st == UDS_PROG_NONE &&
+         start_addr == P_DRIVER_START_ADDR &&
+           end_addr == P_DRIVER_ENDxx_ADDR)
+    {
+        uds_prog_st =  UDS_PROG_FLASH_DRIVER_DOWNLOADING;
+        ret = TRUE;
+    } else
+    if (uds_prog_st == UDS_PROG_ERASE_MEMORY_COMPLETE && 
+         start_addr == P_APP_START_ADDR &&
+           end_addr <= P_APP_ENDxx_ADDR)
+    {
+        uds_prog_st =  UDS_PROG_APP_DOWNLOADING;
+        ret = TRUE;
+    }
+    else
+    {
+        ret = FALSE;
+    }
+    return ret;
+}
+
+/**
+ * uds_service_34 - uds service 0x34, RequestDownload
+ *
+ * @msg_buf :
+ * @msg_dlc :
+ *
+ * returns:
+ *     void
+ */
+static void
+uds_service_34 (uint8_t msg_buf[], uint16_t msg_dlc)
+{
+  uint8_t rsp_buf[8];
+  uint8_t data_format;
+  uint8_t addr_len_format;
+  uint32_t end_mem_addr;
+
+  data_format = msg_buf[1];
+  addr_len_format = msg_buf[2];
+
+  start_mem_addr = can_to_hostl(&msg_buf[3]);
+	total_mem_size = can_to_hostl(&msg_buf[7]);
+	end_mem_addr = start_mem_addr + total_mem_size - 1;
+
+  if (uds_prog_st != UDS_PROG_NONE &&
+	    uds_prog_st != UDS_PROG_ERASE_MEMORY_COMPLETE)
+	{
+      uds_prog_st = UDS_PROG_NONE;
+      uds_negative_rsp (SID_34,NRC_CONDITIONS_NOT_CORRECT);
+      return;
+	}
+
+	if (data_format != UDS_VALID_DATA_FORMAT || addr_len_format != UDS_VALID_ADDR_LEN_FORMAT ||
+	    download_request_valid (start_mem_addr, end_mem_addr) == FALSE)
+	{
+      uds_prog_st = UDS_PROG_NONE;
+	    uds_negative_rsp (SID_34,NRC_REQUEST_OUT_OF_RANGE);
+      return;
+  }
+
+  total_recv_len = 0;
+  local_sn = 1;
+  crc32_calc = CRC32_INIT;
+
+  rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_34);
+  rsp_buf[1] = UDS_LENGTH_FORMAT_ID;
+  host_to_canl (&rsp_buf[2], UDS_MAX_NUM_BLOCK_LEN);
+  uds_positive_rsp (rsp_buf,6);
+  //uds_negative_rsp (SID_2F,NRC_CONDITIONS_NOT_CORRECT);
+}
+
+/**
+ * uds_service_36 - uds service 0x36, TransferData 
+ *
+ * @msg_buf :
+ * @msg_dlc :
+ *
+ * returns:
+ *     void
+ */
+static void
+uds_service_36 (uint8_t msg_buf[], uint16_t msg_dlc)
+{
+  uint8_t rsp_buf[8];
+  uint8_t block_sn;
+  uint32_t write_addr;
+  uint16_t write_len;
+  uint16_t ret;
+
+  block_sn = msg_buf[1];
+  write_len = msg_dlc - 2;
+
+    if ((uds_prog_st != UDS_PROG_APP_DOWNLOADING && uds_prog_st != UDS_PROG_FLASH_DRIVER_DOWNLOADING) ||
+	     total_recv_len == total_mem_size)
+	{
+		uds_negative_rsp (SID_36,NRC_REQUEST_SEQUENCE_ERROR);
+		return;
+	}
+	if (block_sn != local_sn && block_sn != (local_sn - 1))
+	{
+	    uds_negative_rsp (SID_36,NRC_WRONG_BLOCK_SEQUENCE_COUNTER);
+		return;
+	}
+    if ((total_recv_len + write_len) > total_mem_size)
+	{
+		uds_negative_rsp (SID_36,NRC_TRANSFER_DATA_SUSPENDED);
+		return;
+	}
+
+	write_addr = start_mem_addr + total_recv_len;
+
+  if (uds_prog_st == UDS_PROG_FLASH_DRIVER_DOWNLOADING)
+    ret = sdram_program (write_addr, &msg_buf[2], write_len);
+  else
+    ret = flash_program (write_addr, &msg_buf[2], write_len);
+  if (ret == write_len)
+  {
+    if (block_sn == local_sn)
+      total_recv_len += write_len;
+    local_sn = block_sn+1;
+    crc32_calc = crc32_discontinue (crc32_calc, &msg_buf[2], write_len);
+
+    rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_36);
+    rsp_buf[1] = block_sn;
+    uds_positive_rsp (rsp_buf,2);
+	}
+	else
+	{
+    uds_negative_rsp (SID_36,NRC_GENERAL_PROGRAMMING_FAILURE);
+	}
+}
+
+/**
+ * uds_service_37 - uds service 0x37, RequestTransferExit 
+ *
+ * @msg_buf :
+ * @msg_dlc :
+ *
+ * returns:
+ *     void
+ */
+static void
+uds_service_37 (uint8_t msg_buf[], uint16_t msg_dlc)
+{
+    uint8_t rsp_buf[8];
+    if ((uds_prog_st != UDS_PROG_APP_DOWNLOADING && uds_prog_st != UDS_PROG_FLASH_DRIVER_DOWNLOADING) || 
+	     total_recv_len != total_mem_size)
+    {
+        uds_prog_st = UDS_PROG_NONE;
+        uds_negative_rsp (SID_36,NRC_REQUEST_SEQUENCE_ERROR);
+        return;
+    }
+
+    uds_prog_st++;
+    total_recv_len = 0;
+    local_sn = 1;
+
+    rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_37);
+    uds_positive_rsp (rsp_buf,1);
 }
 
 /**
@@ -1137,9 +1214,12 @@ uds_data_indication (uint8_t msg_buf[], uint16_t msg_dlc, n_result_t n_result)
 	{
         if (sid == uds_service_list[i].uds_sid)
 		{
+			session_spt = FALSE;
             if (uds_session == UDS_SESSION_STD)
 			    session_spt = uds_service_list[i].std_spt;
-			else
+			if (uds_session == UDS_SESSION_PROG)
+				session_spt = uds_service_list[i].pro_spt;
+			if (uds_session == UDS_SESSION_EOL)
 			    session_spt = uds_service_list[i].ext_spt;
 			if (session_spt == TRUE)
 			{
@@ -1205,6 +1285,32 @@ uds_data_confirm (n_result_t n_result)
     Function  Definition - external API
 *******************************************************************************/ 
 /**
+ * uds_chk_session - check the uds session, if in program session, 
+ *                   then send response
+ *
+ * @void :
+ *
+ * returns:
+ *     void
+ */
+extern void
+uds_chk_session (void)
+{
+  uint8_t rsp_buf[8];
+
+  if (uds_session == UDS_SESSION_PROG)
+  {
+    rsp_buf[0] = USD_GET_POSITIVE_RSP (SID_10);
+	rsp_buf[1] = UDS_SESSION_PROG;
+	rsp_buf[2] = (uint8_t)(P2_SERVER >> 8);
+	rsp_buf[3] = (uint8_t)(P2_SERVER & 0x00ff);
+	rsp_buf[4] = (uint8_t)(P2X_SERVER >> 8);
+	rsp_buf[5] = (uint8_t)(P2X_SERVER & 0x00ff);
+	uds_positive_rsp (rsp_buf, 6);
+  }
+}
+
+/**
  * uds_get_frame - uds get a can frame, then transmit to network
  *
  * @func_addr : 0 - physical addr, 1 - functional addr
@@ -1257,6 +1363,7 @@ uds_main (void)
  *
  * returns:
  *     0 - ok
+ * descrip: uds init must be front of can_init
  */
 extern int
 uds_init (void)
@@ -1266,7 +1373,8 @@ uds_init (void)
     uds_session = UDS_SESSION_STD;
     uds_ioctrl_allstop();
     uds_load_rwdata ();
-    uds_timer_start (UDS_TIMER_FSA);	
+	load_all_uds_data ();
+    uds_timer_start_se (UDS_TIMER_FSA);	
     usdata.ffindication = uds_dataff_indication;
     usdata.indication = uds_data_indication;
     usdata.confirm = uds_data_confirm;

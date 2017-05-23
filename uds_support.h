@@ -72,24 +72,34 @@ typedef enum __UDS_ROUTINE_STATUS__
 	UDS_RT_ST_RUNNING = 0x01,
 	UDS_RT_ST_SUCCESS = 0x02,
 	UDS_RT_ST_FAILED = 0x03
-}uds_routine_status;
+}uds_rtst_t;
 
 /* uds routine control */
 typedef struct __UDS_RTCTROL_T__
 {
     uint16_t rid;
-    uds_routine_status rtst;
+    uint8_t *p_data;
+    uint8_t dlc;
     uint8_t (* init_routine) (void);
     uint8_t (* run_routine) (void);
     uint8_t (* stop_routine) (void);
 }uds_rtctrl_t;
 
+/* uds routine index */
+typedef enum __UDS_ROUTINE_INDEX__
+{
+	UDS_RT_CHECK = 0,
+	UDS_RT_ERASE,
+	UDS_RT_DEPEND,
+	UDS_RT_CNT
+}uds_routine_index;
 #define RWDATA_CNT  14
 #define IOCTRL_CNT  5
-#define RTCTRL_CNT  1
+#define RTCTRL_CNT  UDS_RT_CNT
 extern const uds_rwdata_t rwdata_list[RWDATA_CNT];
 extern uds_ioctrl_t ioctrl_list[IOCTRL_CNT];
 extern const uds_rtctrl_t rtctrl_list[RTCTRL_CNT];
+extern uds_rtst_t rtst_list[RTCTRL_CNT];
 
 
 #define RWDATA_NUM  (sizeof(rwdata_list) / sizeof(uds_rwdata_t))
@@ -122,5 +132,8 @@ uds_ioctrl_allstop (void);
  */
 void
 uds_load_rwdata (void);
+
+void
+uds_save_rwdata (void);
 #endif
 /****************EOF****************/

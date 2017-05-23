@@ -11,14 +11,25 @@
 /*******************************************************************************
     Include Files
 *******************************************************************************/
+#include <string.h>
 #include <absacc.h>
+#include "uds_util.h"
 #include "uds_support.h"
-
+#include "uds_program.h"
+#include "uds_service.h"
+#include "timx.h"
+#include "uds_status.h"
 /*******************************************************************************
     Function  declaration
 *******************************************************************************/
 static uint8_t
 rtctrl_nothing (void);
+static uint8_t
+rtctrl_check_routine (void);
+static uint8_t
+rtctrl_erase_memory (void);
+static uint8_t
+rtctrl_check_dependence (void);
 static uint8_t
 ioctrl_init_backlight (void);
 static uint8_t
@@ -109,14 +120,21 @@ uds_ioctrl_t ioctrl_list[IOCTRL_CNT] =
     {0xF024, indicator,       6, 0, 0, 0, &ioctrl_init_indicator, &ioctrl_stop_indicator}
 };
 
+uint8_t crc_param[4];
+uint8_t mem_aands[9];
+uint8_t dpn_param[4];
 const uds_rtctrl_t rtctrl_list[RTCTRL_CNT] =
 {
-    {0, UDS_RT_ST_IDLE, &rtctrl_nothing, &rtctrl_nothing, &rtctrl_nothing}
+    {0xF001, crc_param, 4, &rtctrl_check_routine, &rtctrl_nothing, &rtctrl_nothing},
+    {0xFF00, mem_aands, 9, &rtctrl_erase_memory,  &rtctrl_nothing, &rtctrl_nothing},
+    {0xFF01, dpn_param, 0, &rtctrl_check_dependence, &rtctrl_nothing, &rtctrl_nothing}
 };
+
+uds_rtst_t rtst_list[RTCTRL_CNT] = {UDS_RT_ST_IDLE, UDS_RT_ST_IDLE, UDS_RT_ST_IDLE};
 
 
 /*******************************************************************************
-    Function  Definition
+    Function  Definition -- for routine control
 *******************************************************************************/
 
 /**
@@ -132,6 +150,198 @@ rtctrl_nothing (void)
 {
     return 0;
 }
+
+/**
+ * rtctrl_check_routine - a temp Function for routine control
+ *
+ * @void :
+ *
+ * returns:
+ *     0 - ok
+ */
+static uint8_t
+rtctrl_check_routine (void)
+{
+	uint8_t  io_err;
+    uint32_t crc_value;
+
+    crc_value = can_to_hostl(crc_param);
+
+    if (uds_prog_st != UDS_PROG_FLASH_DRIVER_DOWNLOAD_COMPLETE &&
+        uds_prog_st != UDS_PROG_APP_DOWNLOAD_COMPLETE)
+    {
+        uds_prog_st = UDS_PROG_NONE;
+        return NRC_CONDITIONS_NOT_CORRECT;
+    }
+
+    if (uds_prog_st == UDS_PROG_FLASH_DRIVER_DOWNLOAD_COMPLETE)
+    {
+        crc32_calc = crc32_continue ((uint8_t *)P_DRIVER_START_ADDR, FLASH_DRIVER_LENGTH);
+    }
+    if (crc_value == crc32_calc)
+    {
+        if (uds_prog_st == UDS_PROG_APP_DOWNLOAD_COMPLETE)
+        {
+#ifdef UDS_INTEG_DATA
+            app_integrity_status = 0x00;
+            spp_compatibility_status = 0x01;
+#endif
+        }
+
+        uds_prog_st++;
+        rtst_list[UDS_RT_CHECK] = UDS_RT_ST_SUCCESS;
+    }
+    else
+    {
+        if (uds_prog_st == UDS_PROG_APP_DOWNLOAD_COMPLETE)
+        {
+#ifdef UDS_INTEG_DATA
+            app_integrity_status = 0x01;
+            spp_compatibility_status = 0x01;
+#endif
+            uds_data.app_valid_flag = 0x00;
+        }
+        uds_prog_st = UDS_PROG_NONE;
+        rtst_list[UDS_RT_CHECK] = UDS_RT_ST_FAILED;
+    }
+
+    io_err = save_all_uds_data();
+	if (io_err == 0)
+      return NRC_NONE;
+	else
+	  return NRC_GENERAL_PROGRAMMING_FAILURE;
+}
+
+
+/**
+ * rtctrl_erase_memory - erase memory routine
+ *
+ * @void :
+ *
+ * returns:
+ *     0 - ok
+ */
+static uint8_t
+rtctrl_erase_memory (void)
+{
+    uint8_t addr_len;
+    uint8_t size_len;
+    uint32_t mem_addr;
+    uint32_t mem_size;
+	uint32_t end_addr;
+    uint16_t erase_len;
+    uint16_t i;
+	uint32_t last_time = 0;
+	uint32_t curr_time;
+
+    if (uds_prog_st != UDS_PROG_FLASH_DRIVER_CRC32_VALID)
+    {
+        uds_prog_st = UDS_PROG_NONE;
+        return NRC_CONDITIONS_NOT_CORRECT;
+    }
+
+    addr_len = UDS_GET_MEM_ADDR_LEN(mem_aands[0]);
+    size_len = UDS_GET_MEM_SIZE_LEN(mem_aands[0]);
+    mem_addr = 0;
+    mem_size = 0;
+    for (i = 0; i < addr_len; i++)
+        mem_addr = (mem_addr << 8) + mem_aands[i+1];
+    for (i = 0; i < size_len; i++)
+        mem_size = (mem_size << 8) + mem_aands[i+addr_len+1];
+
+	end_addr = mem_addr + mem_size - 1;
+    if (P_APP_START_ADDR != mem_addr ||
+        P_APP_ENDxx_ADDR <  end_addr)
+    {
+        uds_prog_st = UDS_PROG_NONE;
+        return NRC_REQUEST_OUT_OF_RANGE;
+    }
+
+	FLASH_UNLOCK;
+    erase_len = 0;
+    for (; mem_addr <= end_addr; )
+    {
+        curr_time = get_time_ms();
+		if ((curr_time - last_time) > TIMEOUT_P2server_x)
+		{
+			last_time = curr_time;
+            uds_negative_rsp(SID_31, NRC_SERVICE_BUSY);
+		}
+        //SW_WATCHDOG_SERVICE();
+        //HD_WATCHDOG_SERVICE();
+        erase_len = flash_erase (mem_addr, P_FLASH_PAGE_SIZE);
+        if (erase_len != 0)
+            mem_addr += erase_len;
+        else
+            break;
+    }
+
+    if(erase_len == 0)
+    {
+        rtst_list[UDS_RT_ERASE] = UDS_RT_ST_FAILED;
+        uds_prog_st = UDS_PROG_NONE;
+        return NRC_GENERAL_PROGRAMMING_FAILURE;
+    }
+    else
+    {
+#ifdef UDS_INTEG_DATA
+        app_integrity_status = 0x01;
+        spp_compatibility_status = 0x01;
+#endif
+        uds_data.app_valid_flag = 0x00;
+
+        rtst_list[UDS_RT_ERASE] = UDS_RT_ST_SUCCESS;
+        uds_prog_st = UDS_PROG_ERASE_MEMORY_COMPLETE;
+        return NRC_NONE;
+    }
+}
+/**
+ * rtctrl_erase_memory - erase memory routine
+ *
+ * @void :
+ *
+ * returns:
+ *     0 - ok
+ */
+static uint8_t
+rtctrl_check_dependence (void)
+{
+	uint8_t io_err;
+
+    if (uds_prog_st != UDS_PROG_APP_CRC32_VALID)
+    {
+        uds_prog_st = UDS_PROG_NONE;
+        return NRC_CONDITIONS_NOT_CORRECT;
+    }
+    uds_prog_st = UDS_PROG_NONE;
+    if (GET_APP_MARK_ID() == APP_MARK_ID)
+    {
+#ifdef UDS_INTEG_DATA
+        app_integrity_status = 0x00;
+        spp_compatibility_status = 0x00;
+#endif
+        uds_data.app_valid_flag = 0x01;
+        //prog_failed_times_slr = 0;
+        //uds_response_pending(0x31);
+        FLASH_LOCK;
+        rtst_list[UDS_RT_DEPEND] = UDS_RT_ST_SUCCESS;
+		io_err = save_all_uds_data();
+	    if (io_err == 0)
+          return NRC_NONE;
+	    else
+	      return NRC_GENERAL_PROGRAMMING_FAILURE;
+    }
+    else
+    {
+        rtst_list[UDS_RT_DEPEND] = UDS_RT_ST_FAILED;
+        return NRC_NONE;
+    }
+
+}
+
+/*******************************************************************************
+    Function  Definition -- for i/o control
+*******************************************************************************/
 
 /**
  * ioctrl_init_backlight - init the backlight control

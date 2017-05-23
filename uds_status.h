@@ -13,7 +13,6 @@
 *******************************************************************************/
 #include <stdint.h>
 #include "uds_type.h"
-
 /*******************************************************************************
     Type Definition
 *******************************************************************************/
@@ -23,9 +22,22 @@
 #define UNDEFINESEED				0xFFFFFFFF
 #define SEEDMASK					0x80000000
 #define SHIFTBIT					1
-#define ALGORITHMASK				0x42303131
+#define ALGORITHMASK				0x4D313232
 
 
+typedef struct __UDS_DATA_T__
+{
+    volatile uint32_t update_request;
+	volatile uint8_t  uds_reset_type;
+	volatile uint8_t  uds_sadelay;
+	volatile uint8_t  uds_safai_rcnt;
+	volatile uint8_t  app_valid_flag;
+}uds_data_t;
+/*******************************************************************************
+    Extern  Varaibles
+*******************************************************************************/
+extern uds_data_t uds_data;
+extern bool_t stay_in_boot;
 /*******************************************************************************
     Function  Definition
 *******************************************************************************/
@@ -42,5 +54,14 @@
 int
 uds_security_access (uint8_t key_buf[], uint8_t seed_buf[]);
 
+
+uint8_t
+uds_session_check (uint8_t session, uint8_t sub_function);
+
+extern void 
+load_all_uds_data (void);
+
+extern uint8_t 
+save_all_uds_data (void);
 #endif
 /****************EOF****************/
