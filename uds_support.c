@@ -280,20 +280,23 @@ rtctrl_erase_memory (void)
     {
         rtst_list[UDS_RT_ERASE] = UDS_RT_ST_FAILED;
         uds_prog_st = UDS_PROG_NONE;
-        return NRC_GENERAL_PROGRAMMING_FAILURE;
     }
     else
     {
-#ifdef UDS_INTEG_DATA
-        app_integrity_status = 0x01;
-        spp_compatibility_status = 0x01;
-#endif
-        uds_data.app_valid_flag = 0x00;
-
         rtst_list[UDS_RT_ERASE] = UDS_RT_ST_SUCCESS;
         uds_prog_st = UDS_PROG_ERASE_MEMORY_COMPLETE;
-        return NRC_NONE;
     }
+
+#ifdef UDS_INTEG_DATA
+  app_integrity_status = 0x01;
+  spp_compatibility_status = 0x01;
+#endif
+  uds_data.app_valid_flag = 0x00;
+  io_err = save_all_uds_data();
+  if (io_err == 0 && rtst_list[UDS_RT_ERASE] == UDS_RT_ST_SUCCESS)
+    return NRC_NONE;
+  else
+    return NRC_GENERAL_PROGRAMMING_FAILURE;
 }
 /**
  * rtctrl_erase_memory - erase memory routine
@@ -321,22 +324,20 @@ rtctrl_check_dependence (void)
         spp_compatibility_status = 0x00;
 #endif
         uds_data.app_valid_flag = 0x01;
-        //prog_failed_times_slr = 0;
-        //uds_response_pending(0x31);
-        FLASH_LOCK;
         rtst_list[UDS_RT_DEPEND] = UDS_RT_ST_SUCCESS;
-		io_err = save_all_uds_data();
-	    if (io_err == 0)
-          return NRC_NONE;
-	    else
-	      return NRC_GENERAL_PROGRAMMING_FAILURE;
     }
     else
     {
+        uds_data.app_valid_flag = 0x00;
         rtst_list[UDS_RT_DEPEND] = UDS_RT_ST_FAILED;
-        return NRC_NONE;
     }
 
+  io_err = save_all_uds_data();
+  FLASH_LOCK;
+  if (io_err == 0 && rtst_list[UDS_RT_DEPEND] == UDS_RT_ST_SUCCESS)
+    return NRC_NONE;
+  else
+    return NRC_GENERAL_PROGRAMMING_FAILURE;
 }
 
 /*******************************************************************************
@@ -493,6 +494,7 @@ uds_ioctrl_allstop (void)
 void
 uds_load_rwdata (void)
 {
+    eeprom_load_rwdata((uint8_t *)&uds_wrbuff, WRBUFF_LEN);
     memset (ASC_ecu_part_num, 0x55, (15+3+10+17+10+3));
 }
 
@@ -507,6 +509,7 @@ uds_load_rwdata (void)
 void
 uds_save_rwdata (void)
 {
+    eeprom_save_rwdata((uint8_t *)&uds_wrbuff, WRBUFF_LEN);
     memset (ASC_ecu_part_num, 0x55, (15+3+10+17+10+3));
 }
 /****************EOF****************/

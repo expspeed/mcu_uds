@@ -155,6 +155,8 @@ load_all_uds_data (void)
     uds_session = UDS_SESSION_PROG;
   if (uds_data.update_request == USB_UPDATE_CODE)
 	stay_in_boot = TRUE;
+  if (uds_data.app_valid_flag == 0xFF)
+	uds_data.app_valid_flag = 0x01;
 
   uds_data.update_request = NON_UPDATE_CODE;
 }
@@ -171,12 +173,11 @@ extern uint8_t
 save_all_uds_data (void)
 {
   if (!memcmp (&uds_data, (void*)UDS_DATA_ADDR, UDS_DATA_SIZE))
-    return 0;	
-  FLASH_UNLOCK;
+    return 0;
+
   flash_erase (UDS_DATA_ADDR, P_FLASH_PAGE_SIZE);
   flash_program (UDS_DATA_ADDR, (uint8_t *)&uds_data, UDS_DATA_SIZE);
-  FLASH_LOCK;
-  
+
   if (!memcmp (&uds_data, (void*)UDS_DATA_ADDR, UDS_DATA_SIZE))
     return 0;
   else
