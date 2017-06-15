@@ -53,10 +53,16 @@ uint8_t g_tatype;
 static void
 send_flowcontrol (uint8_t flow_st);
 
+typedef void
+ffindication_default (uint16_t msg_dlc);
+typedef void
+indication_default (uint8_t msg_buf[], uint16_t msg_dlc, n_result_t n_result);
+typedef void
+confirm_default (n_result_t n_result);
 //static indication_func uds_indication = NULL;
 //static confirm_func uds_confirm = NULL;
 
-static nt_usdata_t N_USData = {NULL, NULL, NULL};
+static nt_usdata_t N_USData = {ffindication_default, indication_default, confirm_default};
 /*******************************************************************************
     Function  Definition - common
 *******************************************************************************/
@@ -184,6 +190,28 @@ clear_network (void)
         nt_timer_stop (num);
 }
 
+/**
+ * nt_usdata_t - nt_usdata default callback
+ * void :
+ *
+ * returns:
+ *     void
+ */
+typedef void
+ffindication_default (uint16_t msg_dlc)
+{
+    return;
+}
+typedef void
+indication_default (uint8_t msg_buf[], uint16_t msg_dlc, n_result_t n_result)
+{
+    return;
+}
+typedef void
+confirm_default (n_result_t n_result)
+{
+    return;
+}
 /*******************************************************************************
     Function  Definition - recieve
 *******************************************************************************/
